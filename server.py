@@ -1,5 +1,6 @@
 import socketserver
 import time
+import json
 
 class ThreadedTCPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
     pass
@@ -34,6 +35,18 @@ class LoggingHandler(socketserver.BaseRequestHandler):
             time.sleep(self.server.timeout)  # Wait for the configured timeout duration
             print(f" No data received from {client_ip}, closing connection.")
             return
+
+           try:
+      
+            data = data.rstrip(delimiter)
+            payload = json.loads(data.decode('utf-8'))
+            log_level = payload.get("logLevel", "INFO")
+            log_message = payload.get("logMessage", "No message provided")
+
+            except Exception:
+            print(f" Malformed log data from {client_ip}")
+            return
+
 
 if __name__ == "__main__":
 print(f" service is running.....")
