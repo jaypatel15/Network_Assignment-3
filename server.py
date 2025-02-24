@@ -75,6 +75,11 @@ class LoggingHandler(socketserver.BaseRequestHandler):
             print(f" Malformed log data from {client_ip}")
             return
 
+            if not is_rate_allowed(client_ip, self.server.max_msgs):
+            response = "Rate limit exceeded. Please slow down."
+            self.request.sendall(response.encode('utf-8'))
+            print(f"Rate limit exceeded for {client_ip}") 
+            return
             
         try:
             with self.server.file_lock:
