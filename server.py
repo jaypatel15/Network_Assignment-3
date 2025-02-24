@@ -1,6 +1,8 @@
 import socketserver
 import time
 import json
+import datetime
+import uuid
 
 class ThreadedTCPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
     pass
@@ -43,9 +45,30 @@ class LoggingHandler(socketserver.BaseRequestHandler):
             log_level = payload.get("logLevel", "INFO")
             log_message = payload.get("logMessage", "No message provided")
 
+             custom_format = self.server.log_format.format(
+                timestamp=datetime.datetime.now(
+                    datetime.timezone(datetime.timedelta(hours=self.server.tz_offset))
+                ).isoformat() + "Z",
+                client=client_ip,
+                level=log_level,
+                message=log_message,
+                correlationId=str(uuid.uuid4())
+            )
+
             except Exception:
             print(f" Malformed log data from {client_ip}")
             return
+
+            
+        try:
+            with self.server.file_lock:
+                with open(self.server.log_file, "a") as f:
+                    f.write(custom_format + "\n")
+            print(f" Logged message from {client_ip}: {custom_format}")
+        except Exception as e:
+            print(f" Failed to write log entry: {e}")
+        
+        self.request.sendall(f"Logged: {custom_format}".encode('utf-8'))
 
 
 if __name__ == "__main__":
