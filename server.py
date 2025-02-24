@@ -3,6 +3,22 @@ import time
 import json
 import datetime
 import uuid
+import threading
+
+client_timestamps = {}
+rate_lock = threading.Lock()
+
+def is_rate_allowed(client_ip, max_msgs):
+    now = time.time()
+    with rate_lock:
+        timestamps = client_timestamps.get(client_ip, [])
+        timestamps = [t for t in timestamps if now - t < 1]  
+        if len(timestamps) >= max_msgs:
+            client_timestamps[client_ip] = timestamps
+            return False
+        timestamps.append(now)
+        client_timestamps[client_ip] = timestamps
+    return True
 
 class ThreadedTCPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
     pass
