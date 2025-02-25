@@ -4,6 +4,7 @@ import json
 import datetime
 import uuid
 import threading
+import argparse
 
 client_timestamps = {}
 rate_lock = threading.Lock()
@@ -92,5 +93,28 @@ class LoggingHandler(socketserver.BaseRequestHandler):
         self.request.sendall(f"Logged: {custom_format}".encode('utf-8'))
 
 
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--host", default="", help="Host/IP to bind")
+    parser.add_argument("--port", type=int, default=8000, help="Port number to bind")
+    parser.add_argument("--logfile", default="logs.txt", help="Path to log file")
+    parser.add_argument("--max", type=int, default=100, help="Max messages per client per second")
+    parser.add_argument("--format", default="[{timestamp}] {client} {level}: {message} (ID: {correlationId})", help="Log message format")
+    parser.add_argument("--timeout", type=int, default=600, help="Client socket timeout in seconds") 
+    parser.add_argument("--tz_offset", type=int, default=-5, help="Timezone offset in hours from UTC")   
+    args = parser.parse_args()
+
+    server = ThreadedTCPServer((args.host, args.port), LoggingHandler)
+    server.log_file = args.logfile
+    server.max_msgs = args.max
+    server.log_format = args.format
+    server.file_lock = threading.Lock()
+    server.timeout = args.timeout
+    server.tz_offset = args.tz_offset
+
+    print(f" service is running.....")
+
+      server.serve_forever()
+
 if __name__ == "__main__":
-print(f" service is running.....")
+    main()
