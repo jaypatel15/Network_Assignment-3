@@ -113,8 +113,12 @@ def main():
     server.tz_offset = args.tz_offset
 
     print(f" service is running.....")
-
-      server.serve_forever()
+     try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        print(" Server shutting down gracefully.")
+        server.shutdown()
+        server.server_close()
 
 if __name__ == "__main__":
     main()
