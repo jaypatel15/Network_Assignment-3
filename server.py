@@ -1,3 +1,13 @@
+"""
+    Name        : Jay Patel  (8888384)
+                  Helly Shah (8958841)
+    Project Name: Server.py
+    Date        : 25th February, 2025
+    Description : A TCP logging server with rate limiting and file logging.
+"""
+# https://docs.python.org/3/library/socketserver.html
+# https://www.geeksforgeeks.org/python-programming-language-tutorial/
+
 import socketserver
 import time
 import json
@@ -6,26 +16,26 @@ import uuid
 import threading
 import argparse
 
-client_timestamps = {}
-rate_lock = threading.Lock()
+client_timestamps = {}   # Track request timestamps per client
+rate_lock = threading.Lock()  # Ensure thread-safe access
 
 def is_rate_allowed(client_ip, max_msgs):
     now = time.time()
     with rate_lock:
         timestamps = client_timestamps.get(client_ip, [])
-        timestamps = [t for t in timestamps if now - t < 1]  
+        timestamps = [t for t in timestamps if now - t < 1]  # Keep only recent timestamps
         if len(timestamps) >= max_msgs:
             client_timestamps[client_ip] = timestamps
-            return False
+            return False    # Exceeded rate limit
         timestamps.append(now)
         client_timestamps[client_ip] = timestamps
     return True
 
 class ThreadedTCPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
-    pass
+    pass  # Enables multithreading support
 
 class LoggingHandler(socketserver.BaseRequestHandler):
-    connection_tracker = set()  
+    connection_tracker = set()  # Track active connections
 
     def handle(self):
         client_ip = self.client_address[0]
@@ -36,15 +46,15 @@ class LoggingHandler(socketserver.BaseRequestHandler):
         self.request.settimeout(self.server.timeout)
         data = b''
         start_time = time.time()
-        delimiter = b'\n' 
+        delimiter = b'\n'  # Define message delimiter
         
         while time.time() - start_time < self.server.timeout:
             try:
-                chunk = self.request.recv(4096)
+                chunk = self.request.recv(4096) # Receive data
                 if chunk:
                     data += chunk
                     if delimiter in data:
-                        break 
+                        break # Stop when a complete message is received
                 else:
                     break  
             except socket.timeout:
@@ -55,14 +65,14 @@ class LoggingHandler(socketserver.BaseRequestHandler):
             print(f" No data received from {client_ip}, closing connection.")
             return
 
-           try:
-      
+        try:
+
             data = data.rstrip(delimiter)
-            payload = json.loads(data.decode('utf-8'))
+            payload = json.loads(data.decode('utf-8'))  # Parse JSON
             log_level = payload.get("logLevel", "INFO")
             log_message = payload.get("logMessage", "No message provided")
-
-             custom_format = self.server.log_format.format(
+            # Format log entry with timestamp, client IP, log level, and message
+            custom_format = self.server.log_format.format(
                 timestamp=datetime.datetime.now(
                     datetime.timezone(datetime.timedelta(hours=self.server.tz_offset))
                 ).isoformat() + "Z",
@@ -72,11 +82,11 @@ class LoggingHandler(socketserver.BaseRequestHandler):
                 correlationId=str(uuid.uuid4())
             )
 
-            except Exception:
+        except Exception:
             print(f" Malformed log data from {client_ip}")
             return
 
-            if not is_rate_allowed(client_ip, self.server.max_msgs):
+        if not is_rate_allowed(client_ip, self.server.max_msgs):
             response = "Rate limit exceeded. Please slow down."
             self.request.sendall(response.encode('utf-8'))
             print(f"Rate limit exceeded for {client_ip}") 
@@ -85,12 +95,12 @@ class LoggingHandler(socketserver.BaseRequestHandler):
         try:
             with self.server.file_lock:
                 with open(self.server.log_file, "a") as f:
-                    f.write(custom_format + "\n")
+                    f.write(custom_format + "\n") # Append log entry
             print(f" Logged message from {client_ip}: {custom_format}")
         except Exception as e:
             print(f" Failed to write log entry: {e}")
         
-        self.request.sendall(f"Logged: {custom_format}".encode('utf-8'))
+        self.request.sendall(f"Logged: {custom_format}".encode('utf-8'))  # Send response
 
 
 def main():
@@ -104,6 +114,7 @@ def main():
     parser.add_argument("--tz_offset", type=int, default=-5, help="Timezone offset in hours from UTC")   
     args = parser.parse_args()
 
+    # Initialize server with user-defined parameters
     server = ThreadedTCPServer((args.host, args.port), LoggingHandler)
     server.log_file = args.logfile
     server.max_msgs = args.max
@@ -114,7 +125,7 @@ def main():
 
     print(f" service is running.....")
      try:
-        server.serve_forever()
+        server.serve_forever() # Start server
     except KeyboardInterrupt:
         print(" Server shutting down gracefully.")
         server.shutdown()
